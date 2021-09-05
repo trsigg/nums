@@ -273,7 +273,20 @@ class UnaryOp(TreeNode):
         else:
             return child_shape
 
-
+class FusionNode(TreeNode):
+    def __init__(self, cluster_state: ClusterState, tree_node_id=None, val="", node_type="", children=[], variables=0):
+        super().__init__(cluster_state, tree_node_id)
+        self.children = children
+        self.val = val 
+        self.node_type = node_type
+        self.vars = variables
+    
+    def is_leaf(self):
+        return self.children == []
+    
+    def __repr__(self):
+        return self.val
+    
 class BinaryOp(TreeNode):
     def __init__(self, cluster_state: ClusterState, tree_node_id=None):
         super().__init__(cluster_state, tree_node_id)
