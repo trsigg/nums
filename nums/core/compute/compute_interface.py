@@ -29,6 +29,12 @@ class ComputeInterface(object):
 
     def diag(self, arr, syskwargs: Dict):
         raise NotImplementedError()
+    
+    def triu_copy(self, arr, syskwargs: Dict):
+        raise NotImplementedError()
+    
+    def triu(self, arr, offset, zero_out, total_elements, syskwargs: Dict):
+        raise NotImplementedError()
 
     def arange(self, start, stop, step, dtype, syskwargs: Dict):
         raise NotImplementedError()

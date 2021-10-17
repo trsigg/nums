@@ -105,7 +105,7 @@ doctest_fallbacks = {
     "tri",
     "tril",
     "tril_indices_from",
-    "triu",
+    #"triu",
     "triu_indices_from",
     "union1d",
 }

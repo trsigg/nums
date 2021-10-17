@@ -132,6 +132,9 @@ class Leaf(TreeNode):
         # evolving its state across all leafs holding a reference to the block.
         super().__init__(cluster_state, tree_node_id)
         self.block = None
+        self.no_args = 0
+        self.rep_value = ""
+        self.node_type = ""
 
     def get_children(self):
         return []
@@ -274,18 +277,18 @@ class UnaryOp(TreeNode):
             return child_shape
 
 class FusionNode(TreeNode):
-    def __init__(self, cluster_state: ClusterState, tree_node_id=None, val="", node_type="", children=[], variables=0):
+    def __init__(self, cluster_state: ClusterState, tree_node_id, val="", node_type="", children=[], variables=0):
         super().__init__(cluster_state, tree_node_id)
         self.children = children
-        self.val = val 
+        self.rep_value = val 
         self.node_type = node_type
-        self.vars = variables
+        self.no_args = variables
     
     def is_leaf(self):
         return self.children == []
     
-    def __repr__(self):
-        return self.val
+    def get_children(self):
+        return self.children
     
 class BinaryOp(TreeNode):
     def __init__(self, cluster_state: ClusterState, tree_node_id=None):
@@ -294,16 +297,20 @@ class BinaryOp(TreeNode):
         self.right: TreeNode = None
         self.op_name = None
         self.args = None
-
-    def __repr__(self):
-        bop_symbol = {
+        self.no_args = 0
+        self.rep_value = ""
+        self.node_type = ""
+        self.bop_symbols = {
             "add": "+",
             "sub": "-",
             "mul": "*",
             "truediv": "/",
             "matmul": "@",
             "tensordot": "@",
-        }[self.op_name]
+        }
+
+    def __repr__(self):
+        bop_symbol = self.bop_symbols[self.op_name]
         return "BOp(id=%s, op=%s%s%s)" % (
             self.tree_node_id,
             str(self.left.tree_node_id),

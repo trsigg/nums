@@ -22,16 +22,15 @@ import scipy.special
 
 from typing import Union
 from nums.core.storage.storage import ArrayGrid
+from nums.core.application_manager import instance
 from nums.core.array.base import BlockArrayBase, Block
 from nums.core.array import utils as array_utils
+from nums.experimental.optimizer.fusion_utils import operator_fusion
 from nums.experimental.optimizer.clusterstate import ClusterState
 from nums.experimental.optimizer.graph import TreeNode, Leaf, UnaryOp, BinaryOp
 from nums.experimental.optimizer.reduction_ops import ReductionOp, TreeReductionOp
 from nums.core.compute.compute_manager import ComputeManager
 from nums.core.grid.grid import DeviceID
-
-
-rop_cls = TreeReductionOp
 
 
 class GraphArray(object):
@@ -216,7 +215,7 @@ class GraphArray(object):
         return GraphArray(
             result_grid, self.cluster_state, arr, copy_on_op=self.copy_on_op
         )
-
+    
     def __add__(self, other):
         other = self.other_to_ba(other)
         return self.ga_from_arr(
@@ -345,3 +344,23 @@ class GraphArray(object):
                 node: TreeNode = q.pop(0)
                 q += node.get_children()
                 yield node
+    @staticmethod
+    def op_fusion(A, B):
+        app: ArrayApplication = instance()
+        cluster_state = ClusterState(app.cm.system.devices())
+        A_graph = GraphArray.from_ba(A, cluster_state=cluster_state)
+        B_graph = GraphArray.from_ba(B, cluster_state=cluster_state)
+        C_graph = (A_graph + B_graph) * app.scalar(2) * B_graph
+        fused_node = operator_fusion(C_graph.graphs[0][0], 2)
+        print(fused_node.rep_value)
+        app.cm.register("fusion_function", eval(fused_node.rep_value), {})
+        C = app.zeros(A.shape, A.block_shape) # init empty ba
+        for grid_entry in C.grid.get_entry_iterator():
+            C.blocks[grid_entry].oid = app.cm.call("fusion_function",
+                                                A.blocks[grid_entry].oid,
+                                                B.blocks[grid_entry].oid,
+                                                syskwargs={
+                                                    "grid_entry": grid_entry,
+                                                    "grid_shape": C.grid.grid_shape
+                                                })
+        return C

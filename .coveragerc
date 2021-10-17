@@ -4,7 +4,7 @@ include =
 omit =
   setup.py
   tests/**/*
-  nums/core/settings.py
+  nums/core/py
   nums/experimental
 
 [report]

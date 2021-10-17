@@ -303,7 +303,11 @@ def trace(a: BlockArray, offset=0, axis1=0, axis2=1, dtype=None, out=None):
         raise NotImplementedError(
             " axis1 != 0 or axis2 != 1 is currently not supported."
         )
-    return sum(diag(a, offset), dtype=dtype, out=out)
+    return sum(diag(a, offset), dtype=dtype, out=out)   
+
+def triu(a: BlockArray) -> BlockArray:
+    app = _instance()
+    return app.triu(a)
 
 
 def atleast_1d(*arys):
