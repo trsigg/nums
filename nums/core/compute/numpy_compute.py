@@ -467,3 +467,7 @@ class ComputeCls(ComputeImp):
 
     def reshape(self, arr, shape):
         return arr.reshape(shape)
+
+    def algebraic(self, name, *arrays, kwargs):
+        op = np.__getattribute__(name)
+        return op(*arrays, **kwargs)

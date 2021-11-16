@@ -147,6 +147,9 @@ class ComputeInterface(object):
     def reshape(self, arr, shape, syskwargs: Dict):
         raise NotImplementedError()
 
+    def algebraic(self, name, *arrays, kwargs, syskwargs: Dict):
+        raise NotImplementedError()
+
 
 class ComputeImp(object):
     pass

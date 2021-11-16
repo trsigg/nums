@@ -28,6 +28,11 @@ from nums.core.compute.compute_manager import ComputeManager
 
 # pylint: disable=too-many-lines
 
+# Centralize all BlockArray and ArrayApplication operations
+# as part of a single execution class here (or in this package).
+# Execution class will handle preprocessing of BlockArrays with
+# partial computation graphs.
+
 
 class BlockArray(BlockArrayBase):
     @classmethod
