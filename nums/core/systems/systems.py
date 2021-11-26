@@ -102,27 +102,41 @@ class MPISystem(SystemInterface):
     def __init__(self):
         # pylint: disable=import-outside-toplevel c-extension-no-member
         from mpi4py import MPI
+        import collections
 
         self.comm = MPI.COMM_WORLD
         self.size = self.comm.Get_size()
         self.rank = self.comm.Get_rank()
+        self.proc_name: str = get_private_ip()
 
         self._devices: List[DeviceID] = []
+
         self._remote_functions: dict = {}
         self._actors: dict = {}
 
-        self.num_cpus = self.size  # int(get_num_cores())
-        self._num_nodes = None  # do some all to all and get ip addresses
+        # This is same as number of mpi processes.
+        self.num_cpus = self.size
+        self._num_nodes: int = None
+
         self._device_to_node: Dict[DeviceID, int] = {}
+        self.node_ranks_dict: Dict[str, list] = collections.defaultdict(list)
         self._actor_node_index = 0
 
     def init(self):
         self.init_devices()
 
     def init_devices(self):
+        # Do an all-gather and collect processor names and rank info.
+        node_names = []
+        self.comm.Allgather({self.proc_name: self.rank}, node_names)
+        # Create a dict with node as key and local ranks as value.
+        for name in node_names:
+            for k, v in name.items():
+                self.node_ranks_dict[k].append(v)
+        self._num_nodes = len(self.node_ranks_dict)
         self._devices = []
         for node in range(self._num_nodes):
-            did = DeviceID(node, "", "cpu", 1)
+            did = DeviceID(node, self.proc_name, "cpu", self.rank)
             self._devices.append(did)
             self._device_to_node[did] = node
 
