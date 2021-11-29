@@ -26,7 +26,7 @@ from nums.core.compute.compute_manager import ComputeManager
 from nums.core.grid.grid import DeviceGrid, CyclicDeviceGrid, PackedDeviceGrid
 from nums.core.systems.filesystem import FileSystem
 from nums.core.systems.system_interface import SystemInterface
-from nums.core.systems.systems import SerialSystem, RaySystem, RaySystemStockScheduler
+from nums.core.systems.systems import SerialSystem, RaySystem, MPISystem, RaySystemStockScheduler
 
 # pylint: disable=global-statement
 
@@ -76,6 +76,8 @@ def create():
         system: SystemInterface = RaySystem(
             use_head=use_head, num_nodes=num_nodes, num_cpus=settings.num_cpus
         )
+    elif system_name == "mpi":
+        system: SystemInterface = MPISystem()
     elif system_name == "ray-scheduler":
         use_head = settings.use_head
         num_nodes = int(np.product(settings.cluster_shape))

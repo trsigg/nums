@@ -83,15 +83,15 @@ class SerialSystem(SystemInterface):
         return self.num_cpus
 
 
-class MPITargetRank(object):
+class MPIDestRank(object):
     def __init__(self, rank: int):
-        self._target_rank = rank
+        self._dest_rank = rank
 
-    def set_target_rank(self, rank: int):
-        self._target_rank = rank
+    def set_dest_rank(self, rank: int):
+        self._dest_rank = rank
 
-    def get_target_rank(self):
-        return self._target_rank
+    def get_dest_rank(self):
+        return self._dest_rank
 
 
 class MPISystem(SystemInterface):
@@ -119,6 +119,8 @@ class MPISystem(SystemInterface):
         self._num_nodes: int = None
 
         self._device_to_node: Dict[DeviceID, int] = {}
+        self._device_to_rank: Dict[DeviceID, int] = {}
+        self._actor_to_rank: dict = {}
         self.node_ranks_dict: Dict[str, list] = collections.defaultdict(list)
         self._actor_node_index = 0
 
@@ -127,8 +129,7 @@ class MPISystem(SystemInterface):
 
     def init_devices(self):
         # Do an all-gather and collect processor names and rank info.
-        node_names = []
-        self.comm.Allgather({self.proc_name: self.rank}, node_names)
+        node_names = self.comm.allgather({self.proc_name: self.rank})
         # Create a dict with node as key and local ranks as value.
         for name in node_names:
             for k, v in name.items():
@@ -139,27 +140,29 @@ class MPISystem(SystemInterface):
             did = DeviceID(node, self.proc_name, "cpu", self.rank)
             self._devices.append(did)
             self._device_to_node[did] = node
+            self._device_to_rank[did] = self.rank
+
 
     def shutdown(self):
         pass
 
     def put(self, value: Any, device_id: DeviceID):
-        target_rank = self._device_to_node[device_id]
-        if self.rank == target_rank:
+        dest_rank = self._device_to_rank[device_id]
+        if self.rank == dest_rank:
             return value
         else:
-            return MPITargetRank(target_rank)
+            return MPIDestRank(dest_rank)
 
     def get(self, object_ids: Union[Any, List]):
         resolved_object_ids = []
         for obj in object_ids:
-            if isinstance(obj, MPITargetRank):
-                target_rank = obj.get_target_rank()
+            if isinstance(obj, MPIDestRank):
+                dest_rank = obj.get_dest_rank()
             # This should be true for just one rank which has the data.
             else:
-                target_rank = self.rank
+                dest_rank = self.rank
             # TODO: see if all-2-all might be more efficient.
-            obj = self.comm.bcast(obj, root=target_rank)
+            obj = self.comm.bcast(obj, root=dest_rank)
             resolved_object_ids.append(obj)
         return resolved_object_ids
 
@@ -177,24 +180,26 @@ class MPISystem(SystemInterface):
         self._remote_functions[name] = self.remote(func, remote_params)
 
     def call(self, name: str, args, kwargs, device_id: DeviceID, options: Dict):
-        target_rank = self._device_to_node[device_id]
-        resolved_args = self._resolve_args(args)
-        if target_rank == self.rank:
+        dest_rank = self._device_to_rank[device_id]
+        resolved_args = self._resolve_args(args, dest_rank)
+        if dest_rank == self.rank:
             return self._remote_functions[name](*resolved_args, **kwargs)
 
-    def _resolve_args(self, args):
+    def _resolve_args(self, args, device_rank):
         # Resolve dependencies: iterate over args and figure out which ones need fetching.
         resolved_args = []
         for arg in args:
             # Check if arg is remote.
-            if isinstance(arg, MPITargetRank):
-                target_rank = arg.get_target_rank()
-                if target_rank == self.rank:
+            if isinstance(arg, MPIDestRank):
+                if device_rank == self.rank:
+                    dest_rank = arg.get_dest_rank()
                     # TODO: Try Isend and Irecv and have a switch for sync and async.
-                    arg = self.comm.recv(target_rank)
-            # This should be true for just one rank.
-            elif target_rank != self.rank:
-                self.comm.send(arg, target_rank)
+                    arg = self.comm.recv(dest_rank)
+            elif device_rank == self.rank:
+                # The arg is local.
+                pass
+            else:
+                self.comm.send(arg, device_rank)
             resolved_args.append(arg)
         self.comm.barrier()
         return resolved_args
@@ -209,24 +214,30 @@ class MPISystem(SystemInterface):
         self._actors[name] = cls
 
     def make_actor(self, name: str, *args, device_id: DeviceID = None, **kwargs):
-        # Resolve args.
-        resolved_args = self._resolve_args(args)
         # Distribute actors round-robin over devices.
         if device_id is None:
             device_id = self._devices[self._actor_node_index]
             self._actor_node_index = (self._actor_node_index + 1) % len(self._devices)
         actor = self._actors[name]
-        target_rank = self._device_to_node[device_id]
-        if target_rank == self.rank:
-            return actor(*resolved_args, **kwargs)
+        dest_rank = self._device_to_rank[device_id]
+        resolved_args = self._resolve_args(args, dest_rank)
+        if dest_rank == self.rank:
+            actor_obj = actor(*resolved_args, **kwargs)
+            actor_id = id(actor_obj)
+            self._actor_to_rank[actor_id] = dest_rank
+            return actor_obj
         else:
-            return MPITargetRank(target_rank)
+            actor_obj = MPIDestRank(dest_rank)
+            actor_id = id(actor_obj)
+            self._actor_to_rank[actor_id] = dest_rank
+            return actor_obj
 
     def call_actor_method(self, actor, method: str, *args, **kwargs):
+        dest_rank = self._actor_to_rank[id(actor)]
         # Resolve args.
-        resolved_args = self._resolve_args(args)
+        resolved_args = self._resolve_args(args, dest_rank)
         # Make sure it gets called on the correct rank.
-        if not isinstance(actor, MPITargetRank):
+        if not isinstance(actor, MPIDestRank):
             return getattr(actor, method)(*resolved_args, **kwargs)
 
     def num_cores_total(self) -> int:
