@@ -22,10 +22,10 @@ from nums.core.compute.compute_manager import ComputeManager
 from nums.core.grid.grid import DeviceGrid, CyclicDeviceGrid, PackedDeviceGrid
 from nums.core.systems import utils as systems_utils
 from nums.core.systems.filesystem import FileSystem
-from nums.core.systems.systems import SystemInterface, SerialSystem, RaySystem
+from nums.core.systems.systems import SystemInterface, SerialSystem, RaySystem, MPISystem
 
 
-@pytest.fixture(scope="module", params=[("serial", "cyclic"), ("ray", "packed")])
+@pytest.fixture(scope="module", params=[("serial", "cyclic"), ("ray", "packed"), ("MPISystem", "packed")])
 def nps_app_inst(request):
     # This triggers initialization; it's not to be mixed with the app_inst fixture.
     # Observed (core dumped) after updating this fixture to run functions with "serial" backend.
@@ -45,7 +45,7 @@ def nps_app_inst(request):
     application_manager.destroy()
 
 
-@pytest.fixture(scope="module", params=[("serial", "cyclic"), ("ray", "packed")])
+@pytest.fixture(scope="module", params=[("serial", "cyclic"), ("ray", "packed"), ("MPISystem", "packed")])
 def app_inst(request):
     # pylint: disable=protected-access
     app_inst = get_app(*request.param)
@@ -64,7 +64,7 @@ def app_inst_s3(request):
 
 
 @pytest.fixture(
-    scope="module", params=[("serial", "cyclic"), ("ray", "cyclic"), ("ray", "packed")]
+    scope="module", params=[("serial", "cyclic"), ("ray", "cyclic"), ("ray", "packed"), ("MPISystem", "packed")]
 )
 def app_inst_all(request):
     # pylint: disable=protected-access
@@ -81,6 +81,8 @@ def get_app(system_name, device_grid_name="cyclic"):
         assert not ray.is_initialized()
         ray.init(num_cpus=systems_utils.get_num_cores())
         system: SystemInterface = RaySystem(use_head=True)
+    elif system_name == "mpi":
+        system: SystemInterface = MPISystem()
     else:
         raise Exception("Unexpected system name %s" % system_name)
     system.init()
