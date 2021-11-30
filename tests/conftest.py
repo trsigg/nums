@@ -25,7 +25,7 @@ from nums.core.systems.filesystem import FileSystem
 from nums.core.systems.systems import SystemInterface, SerialSystem, RaySystem, MPISystem
 
 
-@pytest.fixture(scope="module", params=[("serial", "cyclic"), ("ray", "packed"), ("MPISystem", "packed")])
+@pytest.fixture(scope="module", params=[("serial", "cyclic"), ("ray", "packed"), ("mpi", "packed")])
 def nps_app_inst(request):
     # This triggers initialization; it's not to be mixed with the app_inst fixture.
     # Observed (core dumped) after updating this fixture to run functions with "serial" backend.
@@ -45,7 +45,7 @@ def nps_app_inst(request):
     application_manager.destroy()
 
 
-@pytest.fixture(scope="module", params=[("serial", "cyclic"), ("ray", "packed"), ("MPISystem", "packed")])
+@pytest.fixture(scope="module", params=[("serial", "cyclic"), ("ray", "packed"), ("mpi", "packed")])
 def app_inst(request):
     # pylint: disable=protected-access
     app_inst = get_app(*request.param)
@@ -64,7 +64,7 @@ def app_inst_s3(request):
 
 
 @pytest.fixture(
-    scope="module", params=[("serial", "cyclic"), ("ray", "cyclic"), ("ray", "packed"), ("MPISystem", "packed")]
+    scope="module", params=[("serial", "cyclic"), ("ray", "cyclic"), ("ray", "packed"), ("mpi", "packed")]
 )
 def app_inst_all(request):
     # pylint: disable=protected-access
